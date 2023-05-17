@@ -1,65 +1,51 @@
- // SPDX-License-Identifier: MIT
-
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+// Import the necessary ERC20 interfaces for token interaction
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract TokenBridge {
-    address public ethToken;
+contract TokenBridgingContract {
+    // Address of the Ethereum token contract
+    address public ethereumToken;
+    
+    // Address of the Celo token contract
     address public celoToken;
-    address public ethBridge;
-    address public celoBridge;
-
-    event Deposit(address indexed user, uint256 amount, address indexed recipient, address indexed toChain);
-    event Withdrawal(address indexed user, uint256 amount, address indexed recipient, address indexed toChain);
-
-    constructor(
-        address _ethToken,
-        address _celoToken,
-        address _ethBridge,
-        address _celoBridge
-    ) {
-        ethToken = _ethToken;
+    
+    // Mapping to track token balances on Ethereum
+    mapping(address => uint256) public ethereumBalances;
+    
+    // Event emitted when tokens are bridged from Ethereum to Celo
+    event TokensBridged(address indexed user, uint256 amount);
+    
+    constructor(address _ethereumToken, address _celoToken) {
+        ethereumToken = _ethereumToken;
         celoToken = _celoToken;
-        ethBridge = _ethBridge;
-        celoBridge = _celoBridge;
     }
-
-    function deposit(
-        uint256 _amount,
-        address _recipient,
-        address _toChain
-    ) external {
-        IERC20(ethToken).transferFrom(msg.sender, address(this), _amount);
-        IERC20(ethToken).approve(ethBridge, _amount);
-        IEthBridge(ethBridge).deposit(ethToken, _amount, _recipient, _toChain);
-        emit Deposit(msg.sender, _amount, _recipient, _toChain);
+    
+    // Deposit tokens on Ethereum and initiate the bridging process
+    function depositTokens(uint256 amount) external {
+        // Transfer the tokens from the user to the contract
+        IERC20(ethereumToken).transferFrom(msg.sender, address(this), amount);
+        
+        // Lock the deposited tokens
+        ethereumBalances[msg.sender] += amount;
+        
+        // Emit an event to notify the bridging process
+        emit TokensBridged(msg.sender, amount);
     }
-
-    function withdraw(
-        uint256 _amount,
-        address _recipient,
-        address _fromChain
-    ) external {
-        ICeloBridge(celoBridge).burn(celoToken, _amount, _recipient, _fromChain);
-        emit Withdrawal(msg.sender, _amount, _recipient, _fromChain);
-    }
-}
-
-interface IEthBridge {
-    function deposit(
-        address token,
-        uint256 amount,
-        address recipient,
-        bytes32 toChain
-    ) external;
-}
-
-interface ICeloBridge {
-    function burn(
-        address token,
-        uint256 amount,
-        address recipient,
-        bytes32 fromChain
-    ) external;
+    
+    // Bridge tokens from Ethereum to Celo
+    function bridgeTokens() external {
+        // Retrieve the token balance of the user on Ethereum
+        uint256 amount = ethereumBalances[msg.sender];
+        
+        // Ensure the user has deposited some tokens
+        require(amount > 0, "No tokens to bridge");
+        
+        // Transfer the tokens to the Celo token contract
+        IERC20(celoToken).transfer(msg.sender, amount);
+        
+        // Update the token balance on Ethereum
+        ethereumBalances[msg.sender] = 0;
+    }
 }
